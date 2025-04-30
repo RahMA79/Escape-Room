@@ -36,7 +36,10 @@ lightPos[] = { 1.0, 1.0, 1.0, 1.0 };
 float TABLE_TOP_WIDTH = 8, TABLE_TOP_LENGTH = 10, TABLE_TOP_THICKNESS = 1;	// Start of Table Variables
 float TABLE_LEG_HEIGHT = 7, TABLE_LEG_WIDTH = 1;
 float tableX = 10, tableY, tableZ;											//End of Table Variables
-
+// light of lamp on table
+bool lampLightOn = false;   // initially off
+GLfloat lampLightPos[] = { 0.0f, 3.5f, -8.0f, 1.0f }; // near lamp shade
+GLfloat lampDiffuse[] = { 1.0f, 1.0f, 0.9f, 1.0f };   // warm light
 
 void init_textures();
 void use_texture(int);
@@ -68,6 +71,8 @@ void drawFan();
 void drawCube(float, float, float);
 void drawTableLeg(float, float);
 void drawTable2();
+void drawLamp();
+void drawBooks();
 
 void main(int argc, char** argv) {
 
@@ -133,13 +138,22 @@ void mydraw() {
 	glPushMatrix();
 	glDisable(GL_LIGHTING);
 	glRotatef(fanRotationAngle, 0.0f, 1.0f, 0.0f);
+	if (lampLightOn) {
+		glEnable(GL_LIGHT1);
+		glLightfv(GL_LIGHT1, GL_POSITION, lampLightPos);
+		glLightfv(GL_LIGHT1, GL_DIFFUSE, lampDiffuse);
+	}
+	else {
+		glDisable(GL_LIGHT1);
+	}
+
 	drawFan();
 	glPopMatrix();
 	glEnable(GL_LIGHTING);
 
 	Room();
 	chair();
-
+	drawLamp();
 	drawTable();
 	drawTable2();
 	glutSwapBuffers();
@@ -173,6 +187,10 @@ void fanTimer(int v) {
 void keyboard(unsigned char key, int x, int y) {
 	if (key == 27)
 		exit(0);
+	if (key == 'l' || key == 'L') {
+		lampLightOn = !lampLightOn;
+		glutPostRedisplay();
+	}
 }
 
 void specialKeyboard(int key, int x, int y) {
@@ -240,6 +258,7 @@ void specialKeyboard(int key, int x, int y) {
 		centerX += cos(toRad(yaw)) * speed;
 		centerZ += sin(toRad(yaw)) * speed;
 	}
+
 	glutPostRedisplay();
 }
 
@@ -914,3 +933,75 @@ void drawTable2() {
 	glDisable(GL_TEXTURE_2D);
 	glPopMatrix();
 }
+
+void drawLamp() {
+	const float shiftX = -2.0f;  // Shift lamp 2 units to the left
+
+	// === Lamp Base ===
+	glPushMatrix();
+	glTranslatef(shiftX, 1.0f, -8.0f);
+	glScalef(1.0f, 0.2f, 1.0f);
+	glColor3f(0.5f, 0.3f, 0.2f);
+	glDisable(GL_TEXTURE_2D);
+	glutSolidCube(1.0f);
+	glPopMatrix();
+
+	// === Lamp Stand ===
+	glPushMatrix();
+	glTranslatef(shiftX, 1.9f, -8.0f);
+	glScalef(0.5f, 1.8f, 0.1f);
+	glColor3f(1.0f, 0.0f, 0.0f);
+	glDisable(GL_TEXTURE_2D);
+	glutSolidCube(1.0f);
+	glPopMatrix();
+
+	// === Lamp Shade (Textured) ===
+	glPushMatrix();
+	glTranslatef(shiftX, 3.2f, -8.0f);
+	glScalef(1.5f, 1.2f, 1.5f);
+	glEnable(GL_TEXTURE_2D);
+	use_texture(3); // Use your texture ID
+	glColor3f(1.0f, 1.0f, 1.0f);
+
+	glBegin(GL_QUADS);
+	// Bottom face
+	glTexCoord2f(0, 0); glVertex3f(-1.0f, -1.0f, 1.0f);
+	glTexCoord2f(1, 0); glVertex3f(1.0f, -1.0f, 1.0f);
+	glTexCoord2f(1, 1); glVertex3f(1.0f, -1.0f, -1.0f);
+	glTexCoord2f(0, 1); glVertex3f(-1.0f, -1.0f, -1.0f);
+
+	// Side 1
+	glTexCoord2f(0, 0); glVertex3f(-1.0f, -1.0f, 1.0f);
+	glTexCoord2f(1, 0); glVertex3f(1.0f, -1.0f, 1.0f);
+	glTexCoord2f(1, 1); glVertex3f(0.5f, 1.0f, 0.5f);
+	glTexCoord2f(0, 1); glVertex3f(-0.5f, 1.0f, 0.5f);
+
+	// Side 2
+	glTexCoord2f(0, 0); glVertex3f(1.0f, -1.0f, 1.0f);
+	glTexCoord2f(1, 0); glVertex3f(1.0f, -1.0f, -1.0f);
+	glTexCoord2f(1, 1); glVertex3f(0.5f, 1.0f, -0.5f);
+	glTexCoord2f(0, 1); glVertex3f(0.5f, 1.0f, 0.5f);
+
+	// Side 3
+	glTexCoord2f(0, 0); glVertex3f(1.0f, -1.0f, -1.0f);
+	glTexCoord2f(1, 0); glVertex3f(-1.0f, -1.0f, -1.0f);
+	glTexCoord2f(1, 1); glVertex3f(-0.5f, 1.0f, -0.5f);
+	glTexCoord2f(0, 1); glVertex3f(0.5f, 1.0f, -0.5f);
+
+	// Side 4
+	glTexCoord2f(0, 0); glVertex3f(-1.0f, -1.0f, -1.0f);
+	glTexCoord2f(1, 0); glVertex3f(-1.0f, -1.0f, 1.0f);
+	glTexCoord2f(1, 1); glVertex3f(-0.5f, 1.0f, 0.5f);
+	glTexCoord2f(0, 1); glVertex3f(-0.5f, 1.0f, -0.5f);
+
+	// Top face
+	glTexCoord2f(0, 0); glVertex3f(-0.5f, 1.0f, 0.5f);
+	glTexCoord2f(1, 0); glVertex3f(0.5f, 1.0f, 0.5f);
+	glTexCoord2f(1, 1); glVertex3f(0.5f, 1.0f, -0.5f);
+	glTexCoord2f(0, 1); glVertex3f(-0.5f, 1.0f, -0.5f);
+	glEnd();
+
+	glDisable(GL_TEXTURE_2D);
+	glPopMatrix();
+}
+
