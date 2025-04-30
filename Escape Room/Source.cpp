@@ -4,12 +4,26 @@
 #include<GL/stb_image.h>
 #include<GL/glut.h>
 
+GLuint textures[7];  // VERY IMPORTANT: CHANGE NUMBER BASED ON NUMBER OF TEXTURES
+
+
 unsigned int texture;
 int width, height, nrChannels;
 unsigned char* data = NULL;
 bool fullScreenMode = true, lightOn = false;
+float ratio, eyey = 10, eyez = 40, eyex = 0;
+float centerX, centerY, centerZ = 20;
+
+
+const float PI = 3.14159265;				// Start of Camera Variables
+bool firstMouse = true;
+float yaw = -80, pitch = -20;
+float lastX = 400, lastY = 300;
+float sensitivity = 0.05f;
+bool skipNextMouseMovement = true;	//End of Camera Variables
+
+
 float fanRotationAngle = 0.0f;
-float ratio, eyey = 10, eyez = 40, eyex = 0, centerX, centerY, centerZ = -20;
 float matamb[] = { 1.0f,1.0f,1.0f,1.0f },
 matdiff[] = { 1.0f,1.0f,1.0f,1.0f },
 matspec[] = { 0.64f,1.0f,1.0f,1.0f },
@@ -18,14 +32,26 @@ lightamb[] = { 1,0,1,1 },
 lightdiff[] = { 0,.6,.6,1 },
 lightspec[] = { .2,.2,.2,1 },
 lightPos[] = { 1.0, 1.0, 1.0, 1.0 };
+
+float TABLE_TOP_WIDTH = 8, TABLE_TOP_LENGTH = 10, TABLE_TOP_THICKNESS = 1;	// Start of Table Variables
+float TABLE_LEG_HEIGHT = 7, TABLE_LEG_WIDTH = 1;
+float tableX = 10, tableY, tableZ;											//End of Table Variables
+
+
+void init_textures();
+void use_texture(int);
+
 void background();
 void mydraw();
 void reshape(int, int);
-void timer(int);
+void fanTimer(int);
+void lightTimer(int);
 void keyboard(unsigned char, int, int);
 void specialKeyboard(int, int, int);
-void load(int imgnum);
-void check(unsigned char* data);
+//void load(int imgnum);
+//void check(unsigned char* data);
+float toRad(float);
+void mouseMovement(int, int);
 
 void rightWall();
 void leftWall();
@@ -34,8 +60,14 @@ void backWall();
 void floor();
 void roof();
 void Room();
+void drawChair();
+void chair();
 void drawTable();
 void drawFan();
+
+void drawCube(float, float, float);
+void drawTableLeg(float, float);
+void drawTable2();
 
 void main(int argc, char** argv) {
 
@@ -46,9 +78,14 @@ void main(int argc, char** argv) {
 	glutFullScreen();
 
 	background();
+
+	init_textures();
+	glutSetCursor(GLUT_CURSOR_NONE);
+	glutPassiveMotionFunc(mouseMovement);
 	glutDisplayFunc(mydraw);
 	glutReshapeFunc(reshape);
-	glutTimerFunc(0, timer, 0);
+	glutTimerFunc(0, fanTimer, 0); // fan
+	glutTimerFunc(0, lightTimer, 0); // light
 	glutKeyboardFunc(keyboard);
 	glutSpecialFunc(specialKeyboard);
 
@@ -58,9 +95,8 @@ void main(int argc, char** argv) {
 void background() {
 	glClearColor(0, 0, 0, 1);
 	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_TEXTURE_2D);
 	// Lighting
-	/*glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
+	glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
 	glLightfv(GL_LIGHT0, GL_AMBIENT, lightamb);
 	glLightfv(GL_LIGHT0, GL_SPECULAR, lightspec);
 	glLightfv(GL_LIGHT0, GL_DIFFUSE, lightdiff);
@@ -70,9 +106,10 @@ void background() {
 	glMaterialfv(GL_FRONT, GL_AMBIENT, matamb);
 	glMaterialfv(GL_FRONT, GL_DIFFUSE, matdiff);
 	glMaterialfv(GL_FRONT, GL_SPECULAR, matspec);
-	glMaterialfv(GL_FRONT, GL_SHININESS, matshin);*/
+	glMaterialfv(GL_FRONT, GL_SHININESS, matshin);
 
 }
+
 void toggleLight(int value) {
 	lightOn = !lightOn;
 
@@ -93,13 +130,18 @@ void mydraw() {
 		centerX, centerY, centerZ,
 		0, 1, 0);
 
+	glPushMatrix();
+	glDisable(GL_LIGHTING);
+	glRotatef(fanRotationAngle, 0.0f, 1.0f, 0.0f);
+	drawFan();
+	glPopMatrix();
+	glEnable(GL_LIGHTING);
+
 	Room();
+	chair();
 
 	drawTable();
-	
-	drawFan();
-	
-
+	drawTable2();
 	glutSwapBuffers();
 }
 
@@ -112,14 +154,20 @@ void reshape(int w, int h) {
 	gluPerspective(45, ratio, 1, 100);
 	glMatrixMode(GL_MODELVIEW);
 }
-
-void timer(int v) {
-	//toggleLight(v);
-	fanRotationAngle += 20.0f; // Adjust speed here
+// Light Toggle Timer
+void lightTimer(int v) {
+	toggleLight(v);
+	glutPostRedisplay();
+	glutTimerFunc(10000, lightTimer, 0);
+}
+// fan movement timer
+void fanTimer(int v) {
+	fanRotationAngle += 20.0f;
 	if (fanRotationAngle > 360.0f)
 		fanRotationAngle -= 360.0f;
+
 	glutPostRedisplay();
-	glutTimerFunc(16, timer, 0);
+	glutTimerFunc(100, fanTimer, 0);
 }
 
 void keyboard(unsigned char key, int x, int y) {
@@ -140,83 +188,224 @@ void specialKeyboard(int key, int x, int y) {
 				GetSystemMetrics(SM_CYSCREEN) / 4);
 		}
 	}
+	//if (key == GLUT_KEY_RIGHT) {
+	//	centerX += .9;
+	//	centerZ += .001;
+	//}
+	//if (key == GLUT_KEY_LEFT) {
+	//	centerX -= .9;
+	//	centerZ -= .001;
+	//}
+	//if (key == GLUT_KEY_DOWN) {
+	//	eyez += 1;
+	//	centerZ +=1;
+	//	
+	//}
+	//if (key == GLUT_KEY_UP) {
+	//	eyez -= 1;
+	//	centerZ -=1;
+	//}
+	//if (key == GLUT_KEY_F3) {
+	//	if (centerY > -2) { // Don't go lower than floor
+	//		centerY -= 0.5;
+	//	}
+	//}
+	//if (key == GLUT_KEY_F4) {
+	//	if (centerY < 20) { // Don't go higher than roof
+	//		centerY += 0.5;
+	//	}
+	//}
+	float speed = 1.5;
 	if (key == GLUT_KEY_RIGHT) {
-		centerX += .9;
-		centerZ += .001;
+		eyex += cos(toRad(yaw) + PI / 2) * speed;
+		eyez += sin(toRad(yaw) + PI / 2) * speed;
+		centerX += cos(toRad(yaw) + PI / 2) * speed;
+		centerZ += sin(toRad(yaw) + PI / 2) * speed;
 	}
 	if (key == GLUT_KEY_LEFT) {
-		centerX -= .9;
-		centerZ -= .001;
+		eyex -= cos(toRad(yaw) + PI / 2) * speed;
+		eyez -= sin(toRad(yaw) + PI / 2) * speed;
+		centerX -= cos(toRad(yaw) + PI / 2) * speed;
+		centerZ -= sin(toRad(yaw) + PI / 2) * speed;
 	}
 	if (key == GLUT_KEY_DOWN) {
-		eyez += 1;
-		centerZ += 1;
-
+		eyex -= cos(toRad(yaw)) * speed;
+		eyez -= sin(toRad(yaw)) * speed;
+		centerX -= cos(toRad(yaw)) * speed;
+		centerZ -= sin(toRad(yaw)) * speed;
 	}
 	if (key == GLUT_KEY_UP) {
-		eyez -= 1;
-		centerZ -= 1;
-	}
-	if (key == GLUT_KEY_F3) {
-		if (centerY > -2) { // Don't go lower than floor
-			centerY -= 0.5;
-		}
-	}
-	if (key == GLUT_KEY_F4) {
-		if (centerY < 20) { // Don't go higher than roof
-			centerY += 0.5;
-		}
+		eyex += cos(toRad(yaw)) * speed;
+		eyez += sin(toRad(yaw)) * speed;
+		centerX += cos(toRad(yaw)) * speed;
+		centerZ += sin(toRad(yaw)) * speed;
 	}
 	glutPostRedisplay();
 }
 
+void init_textures() {
+	const char* filenames[7] = {
+		"", // dummy for index 0
+		"floor.jpg",
+		"roof.jpg",
+		"chair-wood.jpg",
+		"table_texture.jpg",
+		"fan_txt.PNG",
+		"wood.jpg"
+	};
 
-void load(int imgnum) {
-	if (imgnum == 1) {
+	for (int i = 1; i <= 6; ++i) {
+		int width, height, nrChannels;
+		unsigned char* data = stbi_load(filenames[i], &width, &height, &nrChannels, 0);
+		if (data) {
+			glGenTextures(1, &textures[i]);
+			glBindTexture(GL_TEXTURE_2D, textures[i]);
 
-		data = stbi_load("floor.jpg", &width, &height, &nrChannels, 0);
-		check(data);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		}
+		else {
+			std::cout << "Failed to load texture: " << filenames[i] << std::endl;
+		}
 	}
-	else if (imgnum == 2) {
-
-		data = stbi_load("roof.jpg", &width, &height, &nrChannels, 0);
-		check(data);
-	}
-	else if (imgnum == 3) {
-
-		data = stbi_load("table_texture.jpg", &width, &height, &nrChannels, 0);
-		check(data);
-	}
-	else if (imgnum == 4) {
-
-		data = stbi_load("fan_txt.PNG", &width, &height, &nrChannels, 0);
-		check(data);
-	}
-	
 }
 
-void check(unsigned char* data) {
-	if (data)
-	{
-		glGenTextures(1, &texture);
-		glBindTexture(GL_TEXTURE_2D, texture);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+void use_texture(int imgnum) {
+	glBindTexture(GL_TEXTURE_2D, textures[imgnum]);
+}
+//void load(int imgnum) {
+//	if (imgnum == 1) {
+//
+//		data = stbi_load("floor.jpg", &width, &height, &nrChannels, 0);
+//		check(data);
+//	}
+//	else if (imgnum == 2) {
+//
+//		data = stbi_load("roof.jpg", &width, &height, &nrChannels, 0);
+//		check(data);
+//	}
+//	else if (imgnum == 3) {
+//		data = stbi_load("chair-wood.jpg", &width, &height, &nrChannels, 0);
+//		check(data);
+//	}
+//	else if (imgnum == 4) {
+//
+//		data = stbi_load("table_texture.jpg", &width, &height, &nrChannels, 0);
+//		check(data);
+//	}
+//	else if (imgnum == 5) {
+//
+//		data = stbi_load("fan_txt.PNG", &width, &height, &nrChannels, 0);
+//		check(data);
+//	}
+//	else if (imgnum == 6) {
+//
+//		data = stbi_load("wood.jpg", &width, &height, &nrChannels, 0);
+//		check(data);
+//	}
+//}
+//
+//void check(unsigned char* data) {
+//	if (data)
+//	{
+//		glGenTextures(1, &texture);
+//		glBindTexture(GL_TEXTURE_2D, texture);
+//		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+//
+//		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+//		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+//		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+//		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+//	}
+//	else
+//	{
+//		std::cout << "Failed to load texture" << std::endl;
+//	}
+//	stbi_image_free(data);
+//}
 
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+float toRad(float deg) {
+	return (deg * PI) / 180;
+}
+
+//void mouseMovement(int horizontalPos, int verticalPos) {
+//	if (firstMouse)
+//	{
+//		glutWarpPointer(glutGet(GLUT_WINDOW_WIDTH) / 2, glutGet(GLUT_WINDOW_HEIGHT) / 2);
+//		lastX = horizontalPos;
+//		lastY = verticalPos;
+//		firstMouse = false;
+//	}
+//	if (skipNextMouseMovement) {
+//		skipNextMouseMovement = false;
+//		//lastX = glutGet(GLUT_WINDOW_WIDTH) / 2;
+//		//lastY = glutGet(GLUT_WINDOW_HEIGHT) / 2;
+//		return;
+//	}
+//	float xoffset = horizontalPos - lastX;
+//	float yoffset = lastY - verticalPos;
+//	lastX = horizontalPos;
+//	lastY = verticalPos;
+//
+//	xoffset *= sensitivity;
+//	yoffset *= sensitivity;
+//
+//	yaw += xoffset;
+//	if (yaw > 360.0f) yaw -= 360.0f;
+//	if (yaw < 0.0f) yaw += 360.0f;
+//
+//	pitch += yoffset;
+//	if (pitch > 89)
+//		pitch = 89;
+//	if (pitch < -89)
+//		pitch = -89;
+//
+//	centerX = eyex + cos(toRad(yaw)) * cos(toRad(pitch));
+//	centerY = eyey + sin(toRad(pitch));
+//	centerZ = eyez + sin(toRad(yaw)) * cos(toRad(pitch));
+//
+//	glutWarpPointer(glutGet(GLUT_WINDOW_WIDTH) / 2, glutGet(GLUT_WINDOW_HEIGHT) / 2);
+//	skipNextMouseMovement = true;
+//	glutPostRedisplay();
+//}
+
+void mouseMovement(int horizontalPos, int verticalPos) {
+	int centerScreenX = glutGet(GLUT_WINDOW_WIDTH) / 2;
+	int centerScreenY = glutGet(GLUT_WINDOW_HEIGHT) / 2;
+
+	if (horizontalPos == centerScreenX && verticalPos == centerScreenY) {
+		return;
 	}
-	else
-	{
-		std::cout << "Failed to load texture" << std::endl;
-	}
-	stbi_image_free(data);
+
+	float xoffset = horizontalPos - centerScreenX;
+	float yoffset = centerScreenY - verticalPos;
+
+	xoffset *= sensitivity;
+	yoffset *= sensitivity;
+
+	yaw += xoffset;
+	if (yaw > 360.0f) yaw -= 360.0f;
+	if (yaw < 0.0f) yaw += 360.0f;
+
+	pitch += yoffset;
+	if (pitch > 89.0f) pitch = 89.0f;
+	if (pitch < -89.0f) pitch = -89.0f;
+
+	centerX = eyex + cos(toRad(yaw)) * cos(toRad(pitch));
+	centerY = eyey + sin(toRad(pitch));
+	centerZ = eyez + sin(toRad(yaw)) * cos(toRad(pitch));
+
+	glutWarpPointer(centerScreenX, centerScreenY);
+	glutPostRedisplay();
 }
 
 void floor() {
+	use_texture(1);
 	glEnable(GL_TEXTURE_2D);
-	load(1);
 	glBegin(GL_QUADS);
 	glTexCoord2d(0.0f, 0.0f);
 	glVertex3f(15, -2, 20);
@@ -229,9 +418,8 @@ void floor() {
 	glEnd();
 }
 
-
 void roof() {
-	load(2);
+	use_texture(2);
 	glBegin(GL_QUADS);
 	glTexCoord2d(0.0f, 0.0f);
 	glVertex3f(15, 20, -20);
@@ -245,7 +433,7 @@ void roof() {
 }
 
 void rightWall() {
-	load(2);
+	use_texture(2);
 	glBegin(GL_QUADS);
 	glTexCoord2d(0.0f, 0.0f);
 	glVertex3f(15, -2, -20);
@@ -259,7 +447,7 @@ void rightWall() {
 }
 
 void leftWall() {
-	load(2);
+	use_texture(2);
 	glBegin(GL_QUADS);
 	glTexCoord2d(0.0f, 0.0f);
 	glVertex3f(-15, -2, -20);
@@ -273,7 +461,7 @@ void leftWall() {
 }
 
 void frontWall() {
-	load(2);
+	use_texture(2);
 	glBegin(GL_QUADS);
 	glTexCoord2d(0.0f, 0.0f);
 	glVertex3f(-15, -2, -20);
@@ -287,7 +475,7 @@ void frontWall() {
 }
 
 void backWall() {
-	load(2);
+	use_texture(2);
 	glBegin(GL_QUADS);
 	glTexCoord2d(0.0f, 0.0f);
 	glVertex3f(-15, -2, 20);
@@ -312,9 +500,140 @@ void Room()
 	glDisable(GL_TEXTURE_2D);
 }
 
+void drawChair()
+{
+	glEnable(GL_TEXTURE_2D);
+	use_texture(3);
+	// Surface
+	glBegin(GL_QUADS);
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(1.0f, 1.5f, 1.0f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(-1.0f, 1.5f, 1.0f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(-1.0f, 1.5f, -1.0f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(1.0f, 1.5f, -1.0f);
+	glEnd();
+
+	float legWidth = 0.2f;
+	float legHeight = 1.5f;
+
+	// Front Right Leg
+	glBegin(GL_QUADS);
+	// Front
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(0.9f, 0.0f, 0.9f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(0.7f, 0.0f, 0.9f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(0.7f, legHeight, 0.9f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(0.9f, legHeight, 0.9f);
+	// Back
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(0.9f, 0.0f, 0.7f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(0.7f, 0.0f, 0.7f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(0.7f, legHeight, 0.7f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(0.9f, legHeight, 0.7f);
+	// Right
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(0.9f, 0.0f, 0.9f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(0.9f, 0.0f, 0.7f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(0.9f, legHeight, 0.7f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(0.9f, legHeight, 0.9f);
+	// Left
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(0.7f, 0.0f, 0.9f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(0.7f, 0.0f, 0.7f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(0.7f, legHeight, 0.7f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(0.7f, legHeight, 0.9f);
+	glEnd();
+
+	// Front Left Leg
+	glBegin(GL_QUADS);
+	// Front
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(-0.7f, 0.0f, 0.9f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(-0.9f, 0.0f, 0.9f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(-0.9f, legHeight, 0.9f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(-0.7f, legHeight, 0.9f);
+	// Back
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(-0.7f, 0.0f, 0.7f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(-0.9f, 0.0f, 0.7f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(-0.9f, legHeight, 0.7f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(-0.7f, legHeight, 0.7f);
+	// Right
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(-0.9f, 0.0f, 0.9f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(-0.9f, 0.0f, 0.7f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(-0.9f, legHeight, 0.7f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(-0.9f, legHeight, 0.9f);
+	// Left
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(-0.7f, 0.0f, 0.9f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(-0.7f, 0.0f, 0.7f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(-0.7f, legHeight, 0.7f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(-0.7f, legHeight, 0.9f);
+	glEnd();
+
+	// Back Right Leg
+	glBegin(GL_QUADS);
+	// Front
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(0.9f, 0.0f, -0.7f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(0.7f, 0.0f, -0.7f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(0.7f, legHeight, -0.7f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(0.9f, legHeight, -0.7f);
+	// Back
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(0.9f, 0.0f, -0.9f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(0.7f, 0.0f, -0.9f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(0.7f, legHeight, -0.9f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(0.9f, legHeight, -0.9f);
+	// Right
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(0.9f, 0.0f, -0.7f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(0.9f, 0.0f, -0.9f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(0.9f, legHeight, -0.9f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(0.9f, legHeight, -0.7f);
+	// Left
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(0.7f, 0.0f, -0.7f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(0.7f, 0.0f, -0.9f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(0.7f, legHeight, -0.9f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(0.7f, legHeight, -0.7f);
+	glEnd();
+
+	// Back Left Leg
+	glBegin(GL_QUADS);
+	// Front
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(-0.7f, 0.0f, -0.7f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(-0.9f, 0.0f, -0.7f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(-0.9f, legHeight, -0.7f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(-0.7f, legHeight, -0.7f);
+	// Back
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(-0.7f, 0.0f, -0.9f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(-0.9f, 0.0f, -0.9f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(-0.9f, legHeight, -0.9f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(-0.7f, legHeight, -0.9f);
+	// Right
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(-0.9f, 0.0f, -0.7f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(-0.9f, 0.0f, -0.9f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(-0.9f, legHeight, -0.9f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(-0.9f, legHeight, -0.7f);
+	// Left
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(-0.7f, 0.0f, -0.7f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(-0.7f, 0.0f, -0.9f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(-0.7f, legHeight, -0.9f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(-0.7f, legHeight, -0.7f);
+	glEnd();
+
+	// Back support
+	glBegin(GL_QUADS);
+	glTexCoord2f(0.0f, 0.0f); glVertex3f(1.0f, 3.5f, -1.0f);
+	glTexCoord2f(1.0f, 0.0f); glVertex3f(-1.0f, 3.5f, -1.0f);
+	glTexCoord2f(1.0f, 1.0f); glVertex3f(-1.0f, 1.5f, -1.0f);
+	glTexCoord2f(0.0f, 1.0f); glVertex3f(1.0f, 1.5f, -1.0f);
+	glEnd();
+
+	glDisable(GL_TEXTURE_2D);
+}
+
+void chair()
+{
+	glPushMatrix();
+	glTranslatef(12, -2, -16);
+	glScalef(2.0f, 2.0f, 2.0f);
+	drawChair();
+	glPopMatrix();
+}
+
 void drawTable() {
 	glEnable(GL_TEXTURE_2D);
-	load(3);  // Load table texture (Capture.PNG)
+	use_texture(4);  // Load table texture (Capture.PNG)
 
 	// Draw Tabletop
 	glPushMatrix();
@@ -373,7 +692,7 @@ void drawTable() {
 
 	// Enable texture for the legs
 	glEnable(GL_TEXTURE_2D);
-	load(3);  // Load texture for legs if it's different
+	use_texture(4);  // Load texture for legs if it's different
 
 	for (int dx = -1; dx <= 1; dx += 2) {
 		for (int dz = -1; dz <= 1; dz += 2) {
@@ -429,10 +748,10 @@ void drawTable() {
 	glDisable(GL_TEXTURE_2D);
 }
 
-// Function to draw the fan with textures and make it rotate
 void drawFan() {
 	glEnable(GL_TEXTURE_2D);
-	load(4);
+
+	use_texture(5);
 
 	float poleHeight = 3.0f;
 	float poleSize = 0.3f;
@@ -490,7 +809,7 @@ void drawFan() {
 	glEnd();
 
 	// ==== Rotate Blades ====
-	glRotatef(fanRotationAngle, 0, 1, 0); 
+	glRotatef(fanRotationAngle, 0, 1, 0);
 
 	// ==== Draw Blades ====
 	float bladeLength = 7.5f;
@@ -518,3 +837,80 @@ void drawFan() {
 	glDisable(GL_TEXTURE_2D);
 }
 
+
+void drawCube(float width, float height, float depth) {
+	float w = width / 2, h = height / 2, d = depth / 2;
+	glBegin(GL_QUADS);
+
+	// Front
+	glTexCoord2f(0, 0); glVertex3f(-w, -h, d);
+	glTexCoord2f(1, 0); glVertex3f(w, -h, d);
+	glTexCoord2f(1, 1); glVertex3f(w, h, d);
+	glTexCoord2f(0, 1); glVertex3f(-w, h, d);
+
+	// Back
+	glTexCoord2f(0, 0); glVertex3f(w, -h, -d);
+	glTexCoord2f(1, 0); glVertex3f(-w, -h, -d);
+	glTexCoord2f(1, 1); glVertex3f(-w, h, -d);
+	glTexCoord2f(0, 1); glVertex3f(w, h, -d);
+
+	// Left
+	glTexCoord2f(0, 0); glVertex3f(-w, -h, -d);
+	glTexCoord2f(1, 0); glVertex3f(-w, -h, d);
+	glTexCoord2f(1, 1); glVertex3f(-w, h, d);
+	glTexCoord2f(0, 1); glVertex3f(-w, h, -d);
+
+	// Right
+	glTexCoord2f(0, 0); glVertex3f(w, -h, d);
+	glTexCoord2f(1, 0); glVertex3f(w, -h, -d);
+	glTexCoord2f(1, 1); glVertex3f(w, h, -d);
+	glTexCoord2f(0, 1); glVertex3f(w, h, d);
+
+	// Top
+	glTexCoord2f(0, 0); glVertex3f(-w, h, d);
+	glTexCoord2f(1, 0); glVertex3f(w, h, d);
+	glTexCoord2f(1, 1); glVertex3f(w, h, -d);
+	glTexCoord2f(0, 1); glVertex3f(-w, h, -d);
+
+	// Bottom
+	glTexCoord2f(0, 0); glVertex3f(-w, -h, -d);
+	glTexCoord2f(1, 0); glVertex3f(w, -h, -d);
+	glTexCoord2f(1, 1); glVertex3f(w, -h, d);
+	glTexCoord2f(0, 1); glVertex3f(-w, -h, d);
+
+	glEnd();
+}
+
+
+// Draw table leg
+void drawTableLeg(float x, float z) {
+	glPushMatrix();
+	glTranslatef(x, TABLE_TOP_THICKNESS, z);
+	drawCube(TABLE_LEG_WIDTH, TABLE_LEG_HEIGHT, TABLE_LEG_WIDTH);
+	glPopMatrix();
+}
+
+// Draw the table
+void drawTable2() {
+	glPushMatrix();
+	glTranslatef(tableX, tableY, tableZ);
+
+	// Draw table top
+	glEnable(GL_TEXTURE_2D);
+	use_texture(6);
+	glPushMatrix();
+	glTranslatef(0.0f, TABLE_LEG_HEIGHT - 2, 0.0f);
+	drawCube(TABLE_TOP_WIDTH, TABLE_TOP_THICKNESS, TABLE_TOP_LENGTH);
+	glPopMatrix();
+
+	// Draw four legs
+	float legOffsetX = TABLE_TOP_WIDTH / 2.0f - TABLE_LEG_WIDTH / 2.0f;
+	float legOffsetZ = TABLE_TOP_LENGTH / 2.0f - TABLE_LEG_WIDTH / 2.0f;
+
+	drawTableLeg(-legOffsetX, -legOffsetZ);  // Back-left
+	drawTableLeg(-legOffsetX, legOffsetZ);   // Front-left
+	drawTableLeg(legOffsetX, -legOffsetZ);  // Back-right
+	drawTableLeg(legOffsetX, legOffsetZ);   // Front-right
+	glDisable(GL_TEXTURE_2D);
+	glPopMatrix();
+}
