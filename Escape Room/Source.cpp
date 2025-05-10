@@ -83,6 +83,21 @@ void drawCoffin();
 void drawModel();
 void loadModel(const char*);
 
+void drawTriangleHand(float, float);
+void drawClockFace();
+void drawClock();
+void drawI(float, float, float);
+void drawV(float, float, float);
+void drawX(float, float, float);
+
+void drawSafeBox();
+void drawQuarterBlade(float);
+void drawBlades();
+void drawAxe(int, int, int);
+
+bool isClickOnBox(int, int);
+void mouseClick(int, int, int, int);
+
 void main(int argc, char** argv) {
 
 	glutInit(&argc, argv);
@@ -167,7 +182,11 @@ void mydraw() {
 	drawLamp();
 	drawTable();
 	drawTable2();
+	drawCard();
 	drawCoffin();
+
+	drawClock();
+	drawSafeBox();
 	glutSwapBuffers();
 }
 
@@ -285,10 +304,13 @@ void init_textures() {
 		"wood.jpg",
 		"card.jpg",
 		"darkwood.jpg",
-		"sk.jpg"
+		"sk.jpg",
+		"safeBox.jpg",		//10
+		"clock.jpg",		//11
+		"metal.jpg"			//12
 	};
 
-	for (int i = 1; i < 10; ++i) {
+	for (int i = 1; i < 13; ++i) {
 		int width, height, nrChannels;
 		unsigned char* data = stbi_load(filenames[i], &width, &height, &nrChannels, 0);
 		if (data) {
@@ -1215,4 +1237,292 @@ void drawModel() {
 	glDisable(GL_TEXTURE_2D);
 	glPopMatrix();
 	glPopMatrix();
+}
+void drawTriangleHand(float length, float baseWidth) {
+	glBegin(GL_TRIANGLES);
+	glVertex3f(0.0f, length, 0.01f);                   // Tip pointing outward
+	glVertex3f(-baseWidth / 2.0f, 0.0f, 0.01f);        // Left base
+	glVertex3f(baseWidth / 2.0f, 0.0f, 0.01f);         // Right base
+	glEnd();
+}
+
+void drawClockFace() {
+	const int segments = 100;
+	float radius = 1.0f;
+
+	glColor3f(1, 1, 1);
+
+	glBegin(GL_TRIANGLE_FAN);
+	glTexCoord2f(0.5f, 0.5f);
+	glVertex3f(0, 0, 0);
+	for (int i = 0; i <= segments; ++i) {
+		float angle = 2.0f * PI * i / segments;
+		glTexCoord2f(0.5f + 0.5f * cos(angle) * radius, 0.5f + 0.5f * sin(angle) * radius);
+		glVertex3f(cos(angle) * radius, sin(angle) * radius, 0);
+	}
+
+	glEnd();
+}
+void drawClock() {
+	glPushMatrix();
+	glTranslatef(0, 15, -19.9);
+	glScalef(2, 2, 2);
+	glEnable(GL_TEXTURE_2D);
+	glEnable(GL_LIGHTING);
+	use_texture(11);
+	drawClockFace();
+	glDisable(GL_LIGHTING);
+
+	glPushMatrix();		// Number 12
+	glScalef(0.3, 0.3, 0.3);
+	drawX(-0.3, 2.5, 0);
+	drawI(0.2, 2.5, 0);
+	drawI(0.5, 2.5, 0);
+	glPopMatrix();
+
+	glPushMatrix();		// Number 3
+	glScalef(0.3, 0.3, 0.3);
+	drawI(2.6, 0, 0);
+	drawI(2.8, 0, 0);
+	drawI(3.0, 0, 0);
+	glPopMatrix();
+
+	glPushMatrix();		// Number 6
+	glScalef(0.3, 0.3, 0.3);
+	drawV(-0.2, -2.5, 0);
+	drawI(0.4, -2.5, 0);
+	glPopMatrix();
+
+	glPushMatrix();		// Number 9
+	glScalef(0.3, 0.3, 0.3);
+	drawI(-3.0, 0, 0);
+	drawX(-2.4, 0, 0);
+	glPopMatrix();
+
+
+	glPushMatrix();
+	glColor3f(0.0, 0.0, 0.0);
+	glRotatef(-90.0f, 0, 0, 1);  // 3:00
+	drawTriangleHand(0.6f, 0.16f);      // Short, wide triangle
+	glPopMatrix();
+
+	glPushMatrix();
+	glColor3f(0.0, 0.0, 0.0);
+	glRotatef(180.0f, 0, 0, 1);   // 6:00
+	drawTriangleHand(0.85f, 0.10f);      // Long, thin triangle
+	glPopMatrix();
+	glPopMatrix();
+
+}
+
+void drawI(float x, float y, float z) {
+	glPushMatrix();
+	glTranslatef(x, y, z);  // Position the "I"
+
+	glColor3f(0.0f, 0.0f, 0.0f);
+
+	// Draw a thin, tall cube for "I"
+	glPushMatrix();
+	glScalef(0.1f, 1.0f, 0.1f);  // Scale cube into a rectangle
+	glutSolidCube(1.0f);
+	glPopMatrix();
+
+	glPopMatrix();
+}
+
+void drawV(float x, float y, float z) {
+	glPushMatrix();
+	glTranslatef(x, y, z);  // Position the "V"
+	glColor3f(0.0f, 0.0f, 0.0f);
+
+	// Left stroke: angled toward center
+	glPushMatrix();
+	glTranslatef(-0.2f, 0.0f, 0.0f);
+	glRotatef(20.0f, 0, 0, 1);  // Tilt in
+	glScalef(0.09f, 1.1f, 0.03f); // Thin, long
+	glutSolidCube(1.0f);
+	glPopMatrix();
+
+	// Right stroke: angled toward center
+	glPushMatrix();
+	glTranslatef(0.2f, 0.0f, 0.0f);
+	glRotatef(-20.0f, 0, 0, 1); // Tilt in
+	glScalef(0.09f, 1.1f, 0.03f);
+	glutSolidCube(1.0f);
+	glPopMatrix();
+
+	glPopMatrix();
+}
+
+
+
+
+void drawX(float x, float y, float z) {
+	glPushMatrix();
+	glTranslatef(x, y, z);  // Position the "X"
+
+	glColor3f(0.0f, 0.0f, 0.0f);
+
+	// First stroke: bottom-left to top-right
+	glPushMatrix();
+	glRotatef(35.0f, 0, 0, 1);
+	glScalef(0.07f, 1.2f, 0.07f);     // Thinner width and depth
+	glutSolidCube(1.0f);
+	glPopMatrix();
+
+	// Second stroke: top-left to bottom-right
+	glPushMatrix();
+	glRotatef(-35.0f, 0, 0, 1);
+	glScalef(0.07f, 1.2f, 0.07f);     // Thinner width and depth
+	glutSolidCube(1.0f);
+	glPopMatrix();
+
+	glPopMatrix();
+}
+
+
+void drawSafeBox() {
+	float s = 0.5f;
+	glPushMatrix();
+	glEnable(GL_TEXTURE_2D);
+	use_texture(10);
+	glTranslatef(12.0f, 10.0f, -18.0f);
+
+
+	glScalef(4.0f, 4.0f, 4.0f);
+	glColor3f(1.0f, 1.0f, 1.0f);
+	glEnable(GL_LIGHTING);
+	glBegin(GL_QUADS);
+
+	// Front
+	glTexCoord2f(0, 0); glVertex3f(-s, -s, s);
+	glTexCoord2f(1, 0); glVertex3f(s, -s, s);
+	glTexCoord2f(1, 1); glVertex3f(s, s, s);
+	glTexCoord2f(0, 1); glVertex3f(-s, s, s);
+
+	// Back
+	glTexCoord2f(0, 0); glVertex3f(-s, -s, -s);
+	glTexCoord2f(1, 0); glVertex3f(s, -s, -s);
+	glTexCoord2f(1, 1); glVertex3f(s, s, -s);
+	glTexCoord2f(0, 1); glVertex3f(-s, s, -s);
+
+	// Left
+	glTexCoord2f(0, 0); glVertex3f(-s, -s, -s);
+	glTexCoord2f(1, 0); glVertex3f(-s, -s, s);
+	glTexCoord2f(1, 1); glVertex3f(-s, s, s);
+	glTexCoord2f(0, 1); glVertex3f(-s, s, -s);
+
+	// Right
+	glTexCoord2f(0, 0); glVertex3f(s, -s, -s);
+	glTexCoord2f(1, 0); glVertex3f(s, -s, s);
+	glTexCoord2f(1, 1); glVertex3f(s, s, s);
+	glTexCoord2f(0, 1); glVertex3f(s, s, -s);
+
+	// Top
+	glTexCoord2f(0, 0); glVertex3f(-s, s, -s);
+	glTexCoord2f(1, 0); glVertex3f(s, s, -s);
+	glTexCoord2f(1, 1); glVertex3f(s, s, s);
+	glTexCoord2f(0, 1); glVertex3f(-s, s, s);
+
+	// Bottom
+	glTexCoord2f(0, 0); glVertex3f(-s, -s, -s);
+	glTexCoord2f(1, 0); glVertex3f(s, -s, -s);
+	glTexCoord2f(1, 1); glVertex3f(s, -s, s);
+	glTexCoord2f(0, 1); glVertex3f(-s, -s, s);
+
+	glEnd();
+
+	glPopMatrix();
+}
+
+
+void drawArm() {
+	glColor3f(0.5f, 0.5f, 0.5f); // metallic gray
+	glPushMatrix();
+	glScalef(0.1f, 2.0f, 0.1f); // thin vertical box
+	glutSolidCube(1.0f);
+	glPopMatrix();
+}
+
+void drawQuarterBlade(float direction) {
+	// direction = +1 for right blade, -1 for left blade
+	glBegin(GL_TRIANGLE_FAN);
+	glTexCoord2f(0.5f, 0.5f); // center of the texture
+	glVertex3f(0.0f, 0.0f, 0.0f);
+
+	for (int i = -45; i <= 45; i += 10) {
+		float angle = i * PI / 180.0f;
+		float x = direction * cos(angle) * 0.7f;
+		float y = sin(angle) * 0.7f;
+
+		// Map (x, y) to texture coordinates assuming unit circle
+		float u = 0.5f + (x / 1.4f); // Normalize between 0–1
+		float v = 0.5f + (y / 1.4f);
+
+		glTexCoord2f(u, v);
+		glVertex3f(x, y, 0.0f);
+	}
+	glEnd();
+}
+
+void drawBlades() {
+	glPushMatrix();
+	glTranslatef(0.0f, -1.0f, 0.0f); // bottom of arm
+	drawQuarterBlade(+1); // right quarter-circle
+	drawQuarterBlade(-1); // left quarter-circle
+	glPopMatrix();
+}
+
+
+void drawAxe(int x, int y, int z) {
+	glPushMatrix();
+	glScalef(4, 4, 4);
+	glEnable(GL_TEXTURE_2D);
+	glTranslatef(x, y, z);
+	use_texture(4);
+	drawArm();
+	use_texture(12);
+	drawBlades();
+	glPopMatrix();
+}
+
+bool isClickOnBox(int mouseX, int mouseY) {
+	GLdouble modelview[16], projection[16];
+	GLint viewport[4];
+	glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
+	glGetDoublev(GL_PROJECTION_MATRIX, projection);
+	glGetIntegerv(GL_VIEWPORT, viewport);
+
+	GLdouble x1, y1, z1, x2, y2, z2;
+
+	gluUnProject(mouseX, viewport[3] - mouseY, 0.0, modelview, projection, viewport, &x1, &y1, &z1); // near
+	gluUnProject(mouseX, viewport[3] - mouseY, 1.0, modelview, projection, viewport, &x2, &y2, &z2); // far
+
+
+	// Ray: from (x1, y1, z1) to (x2, y2, z2)
+	// Perform intersection test with your objects
+
+	float Z0 = -19.5, xmin = 10, xmax = 14, ymin = 8, ymax = 12;
+	float dz = z2 - z1;
+	if (dz == 0.0f) return false; // Ray is parallel to the plane
+
+	float t = (Z0 - z1) / dz;
+
+	if (t < 0.0f || t > 1.0f) return false; // Intersection is outside ray segment
+
+	float x = x1 + t * (x2 - x1);
+	float y = y1 + t * (y2 - y1);
+	std::cout << x << ' ' << y << '\n';
+
+	return (x >= xmin && x <= xmax && y >= ymin && y <= ymax);
+}
+
+void mouseClick(int button, int state, int x, int y) {
+	if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+		if (isClickOnBox(x, y)) {
+			std::cout << "Box was clicked!\n";
+		}
+		else
+			std::cout << "Not yet!\n";
+	}
 }
