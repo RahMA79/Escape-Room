@@ -174,7 +174,7 @@ void mydraw() {
 
 	glPushMatrix();
 	glDisable(GL_LIGHTING);
-	glRotatef(fanRotationAngle, 0.0f, 1.0f, 0.0f);
+	
 	if (lampLightOn) {
 		glEnable(GL_LIGHT1);
 		glLightfv(GL_LIGHT1, GL_POSITION, lampLightPos);
@@ -183,10 +183,13 @@ void mydraw() {
 	else {
 		glDisable(GL_LIGHT1);
 	}
-
-	drawFan();
 	glPopMatrix();
 	glEnable(GL_LIGHTING);
+
+	glPushMatrix();
+	glRotatef(fanRotationAngle, 0.0f, 1.0f, 0.0f);
+	drawFan();
+	glPopMatrix();
 
 	Room();
 	chair();
@@ -196,10 +199,12 @@ void mydraw() {
 	drawLamp();
 	drawTable();
 	drawTable2();
+	drawSafeBox();
 	drawCard();
 	drawCoffin();
 	drawClock();
-	drawSafeBox();
+	
+	
 	glutSwapBuffers();
 }
 
@@ -1346,6 +1351,7 @@ void drawClock() {
 	drawTriangleHand(0.85f, 0.10f);      // Long, thin triangle
 	glPopMatrix();
 	glPopMatrix();
+	glDisable(GL_TEXTURE_2D);
 
 }
 
@@ -1467,6 +1473,7 @@ void drawSafeBox() {
 	glEnd();
 
 	glPopMatrix();
+	glDisable(GL_TEXTURE_2D);
 }
 
 
